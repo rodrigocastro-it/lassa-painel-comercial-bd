@@ -31,16 +31,14 @@ O front-end lê a URL base da API de `VITE_API_BASE_URL` (arquivo `.env`).
 
 ## Logo
 
-Coloque o arquivo PNG da logo (fundo transparente) em:
-
-```
-frontend/public/logo-lassa.png
-```
-
-O `Header` (`src/components/layout/Header.jsx`) já está preparado para
-carregar esse arquivo automaticamente. Enquanto ele não existir, é exibido um
-logotipo textual "LASSA" como placeholder — nenhuma alteração de código é
-necessária ao adicionar o PNG.
+A logo oficial (PNG, fundo transparente) já está em
+`frontend/public/logo-lassa.png` e é carregada automaticamente pelo
+`Header` (`src/components/layout/Header.jsx`). Os favicons
+(`favicon-16.png`, `favicon-32.png`, `favicon-180.png`) foram recortados a
+partir dela (o ícone do copo/gota). Para trocar a logo no futuro, basta
+substituir esse arquivo — nenhuma alteração de código é necessária; se o
+arquivo estiver ausente, o Header cai automaticamente para um logotipo
+textual "LASSA" como placeholder.
 
 ## Estrutura de pastas
 
