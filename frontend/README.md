@@ -106,41 +106,52 @@ Produtos" usa como alternativa o campo `canal` já calculado por
 `FiltersBar` já implementa cascata real: escolher uma Área restringe as
 opções de Zona às que pertencem àquela área; escolher uma Zona restringe
 Setor; escolher um Setor restringe Rota — e trocar um nível de cima limpa
-os níveis abaixo automaticamente. Hoje as opções vêm vazias (ver lacunas
-abaixo) porque `/api/vendedores/resumo` ainda não retorna esses campos;
-assim que retornar (limpos ou como chave bruta — ambos são aceitos, ver
-seção acima), a cascata funciona sem nenhuma mudança de código.
+os níveis abaixo automaticamente. As opções vêm de `/api/vendedores/resumo`
+(campo `area`, já parseado pelo front em zona/setor/rota — ver seção
+acima); um vendedor sem vínculo de rota não aparece nos filtros nem nos
+macro filtros Grandes Redes/Varejo, só na Visão Geral.
 
-## Lacunas conhecidas no backend (não são bugs do front)
+## Status do campo `area` no backend
 
-O front-end já foi construído **esperando** os campos abaixo — assim que o
-backend passar a retorná-los (limpos ou como a chave bruta do WiBi, ver
-acima), os filtros e agrupamentos correspondentes ativam automaticamente,
-sem nenhuma alteração de código:
+`v_clientes_rotas.es_codigo` é a coluna real que guarda a chave WiBi
+(`001.A.0007.0007.0307`). O `server.js` já foi ajustado para devolver
+`area` (a chave bruta, parseada no front por `wibiRota.js`) nestes
+endpoints, sempre a partir de uma CTE que pré-agrega `v_clientes_rotas`
+por vendedor/cliente **antes** de cruzar com as vendas — para não
+multiplicar `SUM(valor_total)` caso um cliente/vendedor tenha mais de uma
+linha na tabela de rotas:
 
-| Campo esperado | Onde é usado | Endpoints que precisam passar a retorná-lo |
-|---|---|---|
-| `area` (ou chave bruta) | Filtro macro Grandes Redes/Varejo, coluna "Área" | `/api/vendedores/resumo`, `/api/vendas/diario` |
-| `supervisor` | Coluna "Gerente/Supervisor" na Visão Executiva | `/api/vendedores/resumo` |
-| `zona`, `setor`, `rota` (ou chave bruta) | Filtros em cascata | `/api/vendedores/resumo` |
+| Endpoint | O que mudou |
+|---|---|
+| `/api/vendedores/resumo` | + coluna `area` |
+| `/api/vendedores/top` | coluna `area` deixou de vir fixa como `''` |
+| `/api/vendedores/clientes-novos-mes` | + coluna `area` (quebra o agrupamento por área também) |
+| `/api/vendas/diario` | passou a retornar **uma linha por dia + área** (antes era uma linha por dia). O front (`EvolucaoDiaria.jsx`) já soma de volta para uma linha por dia depois de aplicar o macro filtro — ver `agregarPorDia()`. |
+| `/api/clientes/top`, `/api/clientes/novos-periodo`, `/api/clientes/top-troca`, `/api/clientes/top-bonificacao` | + coluna `area` |
 
-Até lá:
+Quando não há vínculo de rota para o cliente/vendedor, a API manda
+`area: ''` (string vazia, não `'—'`) — o front trata isso como "não
+classificado": o registro some dos filtros Grandes Redes/Varejo (para não
+inflar nenhum dos dois grupos) e só aparece na Visão Geral, com "—" exibido
+na tabela (`Table.jsx` converte `''`/`null` em "—" na hora de renderizar).
 
-- A tabela "Resumo por Área/Supervisor" usa `/api/canais/resumo` como
-  origem (Grandes Redes vs. Varejo Tradicional), com a coluna Supervisor
-  vazia.
-- Os filtros de Área/Zona/Setor/Rota aparecem desabilitados com a nota
-  "Aguardando o backend retornar este campo".
-- O Ranking de Vendedores exibe uma lista única "Todos os Vendedores" em
-  vez de agrupada por área/supervisor.
+**O que ainda falta** (nenhuma é bug, só ausência de dado no backend):
+
+- `supervisor` — a coluna "Gerente/Supervisor" na Visão Executiva continua
+  vazia; não identificamos uma coluna equivalente a `es_codigo` para isso
+  em `v_clientes_rotas` ou `wbx_vw_vendedores` ainda.
 - A métrica "dias com venda na área" (dias distintos com pelo menos um
   pedido por vendedor) não é calculável com os endpoints atuais — seria
   necessário um novo agregado no backend.
+- Removidas duas rotas duplicadas em `server.js` (`/api/vendedores/resumo`
+  e `/api/clientes/top` estavam definidas duas vezes; o Express só usa a
+  primeira, a segunda nunca era executada).
 
-Do lado do backend, falta apenas eu saber **em que coluna** de
-`v_clientes_rotas` está a chave `001.A.0007.0007.0407` (ex.: `sp_columns
-'v_clientes_rotas'`) para eu montar o `JOIN`/`SUBSTRING` em `server.js` e
-os endpoints passarem a devolver esses campos de verdade.
+**Importante:** essas queries foram revisadas com cuidado (evitando o
+padrão de JOIN direto que multiplicaria valores), mas não puderam ser
+testadas contra o SQL Server real neste ambiente — rode a suíte local
+(`npm test` na raiz, com `.env` apontando para o banco) ou teste manualmente
+antes de considerar isso validado em produção.
 
 ## Exportação (Excel / PDF / PNG)
 

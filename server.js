@@ -89,30 +89,42 @@ app.get('/api/vendedores/resumo', async (req, res) => {
                   AND v.troca = 0 
                 GROUP BY v.id_vendedor 
             ), 
-            novos_agg AS ( 
-                SELECT 
-                    b.vn_codigo AS id_vendedor, 
-                    COUNT(DISTINCT c.id_cliente) AS clientes_novos 
-                FROM bi.wbx_vw_clientes c 
-                INNER JOIN v_clientes_rotas b ON b.cl_codigo = c.id_cliente 
-                WHERE c.is_deleted = 0 
+            novos_agg AS (
+                SELECT
+                    b.vn_codigo AS id_vendedor,
+                    COUNT(DISTINCT c.id_cliente) AS clientes_novos
+                FROM bi.wbx_vw_clientes c
+                INNER JOIN v_clientes_rotas b ON b.cl_codigo = c.id_cliente
+                WHERE c.is_deleted = 0
                   AND CAST(c.datacadas AS DATE) BETWEEN CAST(@dataInicio AS DATE) AND CAST(@dataFim AS DATE)
-                GROUP BY b.vn_codigo 
-            ) 
-            SELECT 
-                ISNULL(vd.nome_abreviado, ISNULL(vd.nome_completo, '—')) AS nome_vendedor, 
-                ISNULL(va.valor_total_raw, 0) AS valor_total_raw, 
-                ISNULL(va.quantidade_pedidos, 0) AS quantidade_pedidos, 
-                ISNULL(va.clientes_atendidos, 0) AS clientes_atendidos, 
-                ISNULL(na.clientes_novos, 0) AS clientes_novos, 
-                CASE 
-                    WHEN ISNULL(va.quantidade_pedidos, 0) > 0 THEN va.valor_total_raw / va.quantidade_pedidos 
-                    ELSE 0 
-                END AS ticket_medio 
-            FROM vendedores_universe u 
-            LEFT JOIN bi.wbx_vw_vendedores vd ON vd.id_vendedor = u.id_vendedor 
-            LEFT JOIN vendas_agg va ON va.id_vendedor = u.id_vendedor 
-            LEFT JOIN novos_agg na ON na.id_vendedor = u.id_vendedor 
+                GROUP BY b.vn_codigo
+            ),
+            area_agg AS (
+                -- Chave de roteirização do WiBi (Coligada.Área.Zona.Setor.Rota, ex.: "001.A.0007.0007.0407").
+                -- Um vendedor pode ter clientes em rotas ligeiramente diferentes; MAX() escolhe uma
+                -- chave representativa por vendedor, suficiente para classificar Área/Zona/Setor/Rota.
+                SELECT
+                    b.vn_codigo AS id_vendedor,
+                    MAX(b.es_codigo) AS area
+                FROM v_clientes_rotas b
+                GROUP BY b.vn_codigo
+            )
+            SELECT
+                ISNULL(vd.nome_abreviado, ISNULL(vd.nome_completo, '—')) AS nome_vendedor,
+                ISNULL(aa.area, '') AS area,
+                ISNULL(va.valor_total_raw, 0) AS valor_total_raw,
+                ISNULL(va.quantidade_pedidos, 0) AS quantidade_pedidos,
+                ISNULL(va.clientes_atendidos, 0) AS clientes_atendidos,
+                ISNULL(na.clientes_novos, 0) AS clientes_novos,
+                CASE
+                    WHEN ISNULL(va.quantidade_pedidos, 0) > 0 THEN va.valor_total_raw / va.quantidade_pedidos
+                    ELSE 0
+                END AS ticket_medio
+            FROM vendedores_universe u
+            LEFT JOIN bi.wbx_vw_vendedores vd ON vd.id_vendedor = u.id_vendedor
+            LEFT JOIN vendas_agg va ON va.id_vendedor = u.id_vendedor
+            LEFT JOIN novos_agg na ON na.id_vendedor = u.id_vendedor
+            LEFT JOIN area_agg aa ON aa.id_vendedor = u.id_vendedor
             ORDER BY ISNULL(na.clientes_novos, 0) DESC, ISNULL(va.valor_total_raw, 0) DESC
         `;
 
@@ -135,23 +147,36 @@ app.get('/api/clientes/top', async (req, res) => {
         const { dataInicio = '2026-09-01', dataFim = '2026-09-30', limit = 15 } = req.query;
 
         const query = `
-            SELECT TOP (${parseInt(limit)}) 
-                ISNULL(MAX(c.nome_abreviado), MAX(c.nome_completo)) AS nome_cliente, 
-                SUM(v.valor_total) AS valor_total_raw, 
-                COUNT(DISTINCT v.id_venda) AS quantidade_pedidos, 
-                CASE 
-                    WHEN COUNT(DISTINCT v.id_venda) > 0 THEN SUM(v.valor_total) / COUNT(DISTINCT v.id_venda) 
-                    ELSE 0 
-                END AS ticket_medio 
-            FROM bi.wbx_vw_vendas_validas v 
-            LEFT JOIN bi.wbx_vw_clientes c 
-                ON c.id_coligada = v.id_coligada AND c.id_cliente = v.id_cliente 
-            WHERE v.is_deleted = 0 
-              AND CAST(v.data_venda AS DATE) BETWEEN CAST(@dataInicio AS DATE) AND CAST(@dataFim AS DATE) 
-              AND v.status IN (2, 3, 4) 
-              AND v.bonif = 0 
-              AND v.troca = 0 
-            GROUP BY v.id_cliente 
+            WITH area_por_cliente AS (
+                -- Uma chave de roteirização representativa por cliente, agregada à parte
+                -- para não multiplicar as linhas de venda no JOIN abaixo caso um cliente
+                -- tenha mais de uma linha em v_clientes_rotas.
+                SELECT
+                    b.cl_codigo AS id_cliente,
+                    MAX(b.es_codigo) AS area
+                FROM v_clientes_rotas b
+                GROUP BY b.cl_codigo
+            )
+            SELECT TOP (${parseInt(limit)})
+                ISNULL(MAX(c.nome_abreviado), MAX(c.nome_completo)) AS nome_cliente,
+                ISNULL(MAX(ac.area), '') AS area,
+                SUM(v.valor_total) AS valor_total_raw,
+                COUNT(DISTINCT v.id_venda) AS quantidade_pedidos,
+                CASE
+                    WHEN COUNT(DISTINCT v.id_venda) > 0 THEN SUM(v.valor_total) / COUNT(DISTINCT v.id_venda)
+                    ELSE 0
+                END AS ticket_medio
+            FROM bi.wbx_vw_vendas_validas v
+            LEFT JOIN bi.wbx_vw_clientes c
+                ON c.id_coligada = v.id_coligada AND c.id_cliente = v.id_cliente
+            LEFT JOIN area_por_cliente ac
+                ON ac.id_cliente = v.id_cliente
+            WHERE v.is_deleted = 0
+              AND CAST(v.data_venda AS DATE) BETWEEN CAST(@dataInicio AS DATE) AND CAST(@dataFim AS DATE)
+              AND v.status IN (2, 3, 4)
+              AND v.bonif = 0
+              AND v.troca = 0
+            GROUP BY v.id_cliente
             ORDER BY SUM(v.valor_total) DESC
         `;
 
@@ -273,17 +298,30 @@ app.get('/api/vendas/diario', async (req, res) => {
         const { dataInicio = '2026-09-01', dataFim = '2026-09-30' } = req.query;
 
         const query = `
-            SELECT 
+            WITH area_por_cliente AS (
+                -- Uma chave de roteirização representativa por cliente, agregada à parte
+                -- para não multiplicar as linhas de venda no JOIN abaixo caso um cliente
+                -- tenha mais de uma linha em v_clientes_rotas.
+                SELECT
+                    b.cl_codigo AS id_cliente,
+                    MAX(b.es_codigo) AS area
+                FROM v_clientes_rotas b
+                GROUP BY b.cl_codigo
+            )
+            SELECT
                 CAST(v.data_venda AS DATE) AS dia,
+                ISNULL(ac.area, '') AS area,
                 SUM(v.valor_total) AS total_vendas,
                 COUNT(DISTINCT v.id_venda) AS total_pedidos
             FROM bi.wbx_vw_vendas_validas v
+            LEFT JOIN area_por_cliente ac
+                ON ac.id_cliente = v.id_cliente
             WHERE v.is_deleted = 0
               AND CAST(v.data_venda AS DATE) BETWEEN CAST(@dataInicio AS DATE) AND CAST(@dataFim AS DATE)
               AND v.status IN (2, 3, 4)
               AND v.bonif = 0
               AND v.troca = 0
-            GROUP BY CAST(v.data_venda AS DATE)
+            GROUP BY CAST(v.data_venda AS DATE), ac.area
             ORDER BY dia ASC
         `;
 
@@ -458,19 +496,31 @@ app.get('/api/vendedores/top', async (req, res) => {
         const { dataInicio = '2026-09-01', dataFim = '2026-09-30' } = req.query;
 
         const query = `
-            SELECT TOP 10 
-                ISNULL(MAX(vd.nome_abreviado), MAX(vd.nome_completo)) AS nome_vendedor, 
-                '' AS area, 
-                SUM(v.valor_total) AS valor_total_raw, 
+            WITH area_agg AS (
+                -- Uma chave de roteirização (área/zona/setor/rota) representativa por vendedor.
+                -- Agregada à parte para não multiplicar as linhas de venda no JOIN abaixo
+                -- (um vendedor tem vários clientes/rotas em v_clientes_rotas).
+                SELECT
+                    b.vn_codigo AS id_vendedor,
+                    MAX(b.es_codigo) AS area
+                FROM v_clientes_rotas b
+                GROUP BY b.vn_codigo
+            )
+            SELECT TOP 10
+                ISNULL(MAX(vd.nome_abreviado), MAX(vd.nome_completo)) AS nome_vendedor,
+                ISNULL(MAX(aa.area), '') AS area,
+                SUM(v.valor_total) AS valor_total_raw,
                 COUNT(DISTINCT v.id_venda) AS quantidade_pedidos
             FROM bi.wbx_vw_vendas_validas v
-            LEFT JOIN bi.wbx_vw_vendedores vd 
-                ON vd.id_coligada = v.id_coligada 
+            LEFT JOIN bi.wbx_vw_vendedores vd
+                ON vd.id_coligada = v.id_coligada
                AND vd.id_vendedor = v.id_vendedor
-            WHERE v.is_deleted = 0 
+            LEFT JOIN area_agg aa
+                ON aa.id_vendedor = v.id_vendedor
+            WHERE v.is_deleted = 0
               AND CAST(v.data_venda AS DATE) BETWEEN CAST(@dataInicio AS DATE) AND CAST(@dataFim AS DATE)
-              AND v.status IN (2, 3, 4) 
-              AND v.bonif = 0 
+              AND v.status IN (2, 3, 4)
+              AND v.bonif = 0
               AND v.troca = 0
             GROUP BY v.id_vendedor
             ORDER BY SUM(v.valor_total) DESC
@@ -488,46 +538,6 @@ app.get('/api/vendedores/top', async (req, res) => {
     }
 });
 
-// Endpoint: Top 15 Clientes (Query top_clientes)
-app.get('/api/clientes/top', async (req, res) => {
-    try {
-        const pool = await getConnection();
-        const { dataInicio = '2026-09-01', dataFim = '2026-09-30' } = req.query;
-
-        const query = `
-            SELECT TOP 15 
-                ISNULL(MAX(c.nome_abreviado), MAX(c.nome_completo)) AS nome_cliente, 
-                SUM(v.valor_total) AS valor_total_raw, 
-                COUNT(DISTINCT v.id_venda) AS quantidade_pedidos, 
-                CASE 
-                    WHEN COUNT(DISTINCT v.id_venda) > 0 THEN SUM(v.valor_total) / COUNT(DISTINCT v.id_venda) 
-                    ELSE 0 
-                END AS ticket_medio
-            FROM bi.wbx_vw_vendas_validas v
-            LEFT JOIN bi.wbx_vw_clientes c 
-                ON c.id_coligada = v.id_coligada 
-               AND c.id_cliente = v.id_cliente
-            WHERE v.is_deleted = 0 
-              AND CAST(v.data_venda AS DATE) BETWEEN CAST(@dataInicio AS DATE) AND CAST(@dataFim AS DATE)
-              AND v.status IN (2, 3, 4) 
-              AND v.bonif = 0 
-              AND v.troca = 0
-            GROUP BY v.id_cliente
-            ORDER BY SUM(v.valor_total) DESC
-        `;
-
-        const result = await pool.request()
-            .input('dataInicio', dataInicio)
-            .input('dataFim', dataFim)
-            .query(query);
-
-        res.json(result.recordset);
-    } catch (error) {
-        console.error('Erro na rota /api/clientes/top:', error);
-        res.status(500).json({ error: 'Erro ao consultar top clientes', details: error.message });
-    }
-});
-
 // Endpoint: Clientes Novos no Período (Query clientes_novos_periodo)
 app.get('/api/clientes/novos-periodo', async (req, res) => {
     try {
@@ -535,26 +545,39 @@ app.get('/api/clientes/novos-periodo', async (req, res) => {
         const { dataInicio = '2026-09-01', dataFim = '2026-09-30' } = req.query;
 
         const query = `
-            SELECT 
-                ISNULL(MAX(c.nome_abreviado), MAX(c.nome_completo)) AS nome_cliente, 
-                ISNULL(SUM(v.valor_total), 0) AS valor_total_raw, 
-                ISNULL(COUNT(DISTINCT v.id_venda), 0) AS quantidade_pedidos, 
-                CASE 
-                    WHEN COUNT(DISTINCT v.id_venda) > 0 THEN SUM(v.valor_total) / COUNT(DISTINCT v.id_venda) 
-                    ELSE 0 
-                END AS ticket_medio 
-            FROM bi.wbx_vw_clientes c 
-            LEFT JOIN bi.wbx_vw_vendas_validas v 
-                ON v.id_coligada = c.id_coligada 
-               AND v.id_cliente = c.id_cliente 
-               AND v.is_deleted = 0 
-               AND CAST(v.data_venda AS DATE) BETWEEN CAST(@dataInicio AS DATE) AND CAST(@dataFim AS DATE) 
-               AND v.status IN (2, 3, 4) 
-               AND v.bonif = 0 
-               AND v.troca = 0 
-            WHERE c.is_deleted = 0 
-              AND CAST(c.datacadas AS DATE) BETWEEN CAST(@dataInicio AS DATE) AND CAST(@dataFim AS DATE) 
-            GROUP BY c.id_cliente 
+            WITH area_por_cliente AS (
+                -- Uma chave de roteirização representativa por cliente, agregada à parte
+                -- para não multiplicar as linhas de venda no JOIN abaixo caso um cliente
+                -- tenha mais de uma linha em v_clientes_rotas.
+                SELECT
+                    b.cl_codigo AS id_cliente,
+                    MAX(b.es_codigo) AS area
+                FROM v_clientes_rotas b
+                GROUP BY b.cl_codigo
+            )
+            SELECT
+                ISNULL(MAX(c.nome_abreviado), MAX(c.nome_completo)) AS nome_cliente,
+                ISNULL(MAX(ac.area), '') AS area,
+                ISNULL(SUM(v.valor_total), 0) AS valor_total_raw,
+                ISNULL(COUNT(DISTINCT v.id_venda), 0) AS quantidade_pedidos,
+                CASE
+                    WHEN COUNT(DISTINCT v.id_venda) > 0 THEN SUM(v.valor_total) / COUNT(DISTINCT v.id_venda)
+                    ELSE 0
+                END AS ticket_medio
+            FROM bi.wbx_vw_clientes c
+            LEFT JOIN bi.wbx_vw_vendas_validas v
+                ON v.id_coligada = c.id_coligada
+               AND v.id_cliente = c.id_cliente
+               AND v.is_deleted = 0
+               AND CAST(v.data_venda AS DATE) BETWEEN CAST(@dataInicio AS DATE) AND CAST(@dataFim AS DATE)
+               AND v.status IN (2, 3, 4)
+               AND v.bonif = 0
+               AND v.troca = 0
+            LEFT JOIN area_por_cliente ac
+                ON ac.id_cliente = c.id_cliente
+            WHERE c.is_deleted = 0
+              AND CAST(c.datacadas AS DATE) BETWEEN CAST(@dataInicio AS DATE) AND CAST(@dataFim AS DATE)
+            GROUP BY c.id_cliente
             ORDER BY ISNULL(SUM(v.valor_total), 0) DESC, MAX(c.nome_completo)
         `;
 
@@ -567,85 +590,6 @@ app.get('/api/clientes/novos-periodo', async (req, res) => {
     } catch (error) {
         console.error('Erro na rota /api/clientes/novos-periodo:', error);
         res.status(500).json({ error: 'Erro ao consultar clientes novos do período', details: error.message });
-    }
-});
-
-// Endpoint: Resumo Consolidado de Vendedores (Query resumo_vendedores)
-app.get('/api/vendedores/resumo', async (req, res) => {
-    try {
-        const pool = await getConnection();
-        const { dataInicio = '2026-09-01', dataFim = '2026-09-30' } = req.query;
-
-        const query = `
-            WITH vendedores_universe AS (
-                -- Vendedores donos de algum cliente novo (via rota)
-                SELECT DISTINCT b.vn_codigo AS id_vendedor
-                FROM bi.wbx_vw_clientes c
-                INNER JOIN v_clientes_rotas b ON b.cl_codigo = c.id_cliente
-                WHERE c.is_deleted = 0
-                  AND CAST(c.datacadas AS DATE) BETWEEN CAST(@dataInicio AS DATE) AND CAST(@dataFim AS DATE)
-                
-                UNION
-                
-                -- Vendedores com vendas válidas no período
-                SELECT DISTINCT v.id_vendedor
-                FROM bi.wbx_vw_vendas_validas v
-                WHERE v.is_deleted = 0
-                  AND CAST(v.data_venda AS DATE) BETWEEN CAST(@dataInicio AS DATE) AND CAST(@dataFim AS DATE)
-                  AND v.status IN (2, 3, 4)
-                  AND v.bonif = 0
-                  AND v.troca = 0
-            ),
-            vendas_agg AS (
-                SELECT 
-                    v.id_vendedor,
-                    SUM(v.valor_total) AS valor_total_raw,
-                    COUNT(DISTINCT v.id_venda) AS quantidade_pedidos,
-                    COUNT(DISTINCT v.id_cliente) AS clientes_atendidos
-                FROM bi.wbx_vw_vendas_validas v
-                WHERE v.is_deleted = 0
-                  AND CAST(v.data_venda AS DATE) BETWEEN CAST(@dataInicio AS DATE) AND CAST(@dataFim AS DATE)
-                  AND v.status IN (2, 3, 4)
-                  AND v.bonif = 0
-                  AND v.troca = 0
-                GROUP BY v.id_vendedor
-            ),
-            novos_agg AS (
-                SELECT 
-                    b.vn_codigo AS id_vendedor,
-                    COUNT(DISTINCT c.id_cliente) AS clientes_novos
-                FROM bi.wbx_vw_clientes c
-                INNER JOIN v_clientes_rotas b ON b.cl_codigo = c.id_cliente
-                WHERE c.is_deleted = 0
-                  AND CAST(c.datacadas AS DATE) BETWEEN CAST(@dataInicio AS DATE) AND CAST(@dataFim AS DATE)
-                GROUP BY b.vn_codigo
-            )
-            SELECT 
-                ISNULL(vd.nome_abreviado, ISNULL(vd.nome_completo, '—')) AS nome_vendedor,
-                ISNULL(va.valor_total_raw, 0) AS valor_total_raw,
-                ISNULL(va.quantidade_pedidos, 0) AS quantidade_pedidos,
-                ISNULL(va.clientes_atendidos, 0) AS clientes_atendidos,
-                ISNULL(na.clientes_novos, 0) AS clientes_novos,
-                CASE 
-                    WHEN ISNULL(va.quantidade_pedidos, 0) > 0 THEN va.valor_total_raw / va.quantidade_pedidos 
-                    ELSE 0 
-                END AS ticket_medio
-            FROM vendedores_universe u
-            LEFT JOIN bi.wbx_vw_vendedores vd ON vd.id_vendedor = u.id_vendedor
-            LEFT JOIN vendas_agg va ON va.id_vendedor = u.id_vendedor
-            LEFT JOIN novos_agg na ON na.id_vendedor = u.id_vendedor
-            ORDER BY ISNULL(na.clientes_novos, 0) DESC, ISNULL(va.valor_total_raw, 0) DESC
-        `;
-
-        const result = await pool.request()
-            .input('dataInicio', dataInicio)
-            .input('dataFim', dataFim)
-            .query(query);
-
-        res.json(result.recordset);
-    } catch (error) {
-        console.error('Erro na rota /api/vendedores/resumo:', error);
-        res.status(500).json({ error: 'Erro ao consultar resumo de vendedores', details: error.message });
     }
 });
 
@@ -682,23 +626,25 @@ app.get('/api/vendedores/clientes-novos-mes', async (req, res) => {
         const { ano = '2026' } = req.query;
 
         const query = `
-            SELECT 
-                MONTH(c.datacadas) AS mes_num, 
-                ISNULL(vn.nome_abreviado, ISNULL(vn.nome_completo, 'Sem vendedor')) AS nome_vendedor, 
-                COUNT(DISTINCT c.id_cliente) AS clientes_novos 
-            FROM bi.wbx_vw_clientes c 
-            LEFT JOIN v_clientes_rotas b 
-                ON b.cl_codigo = c.id_cliente 
-            LEFT JOIN bi.wbx_vw_vendedores vn 
-                ON vn.id_vendedor = b.vn_codigo 
-            WHERE c.is_deleted = 0 
-              AND YEAR(c.datacadas) = @ano 
-            GROUP BY 
-                MONTH(c.datacadas), 
-                vn.nome_abreviado, 
-                vn.nome_completo 
-            ORDER BY 
-                MONTH(c.datacadas), 
+            SELECT
+                MONTH(c.datacadas) AS mes_num,
+                ISNULL(vn.nome_abreviado, ISNULL(vn.nome_completo, 'Sem vendedor')) AS nome_vendedor,
+                ISNULL(b.es_codigo, '') AS area,
+                COUNT(DISTINCT c.id_cliente) AS clientes_novos
+            FROM bi.wbx_vw_clientes c
+            LEFT JOIN v_clientes_rotas b
+                ON b.cl_codigo = c.id_cliente
+            LEFT JOIN bi.wbx_vw_vendedores vn
+                ON vn.id_vendedor = b.vn_codigo
+            WHERE c.is_deleted = 0
+              AND YEAR(c.datacadas) = @ano
+            GROUP BY
+                MONTH(c.datacadas),
+                vn.nome_abreviado,
+                vn.nome_completo,
+                b.es_codigo
+            ORDER BY
+                MONTH(c.datacadas),
                 nome_vendedor
         `;
 
@@ -778,18 +724,31 @@ app.get('/api/clientes/top-troca', async (req, res) => {
         const { dataInicio = '2026-09-01', dataFim = '2026-09-30' } = req.query;
 
         const query = `
-            SELECT TOP 20 
-                ISNULL(MAX(c.nome_abreviado), MAX(c.nome_completo)) AS nome_cliente, 
-                ISNULL(CAST(SUM(v.quantidade) AS FLOAT), 0) AS sum_quantidade, 
-                COUNT(DISTINCT v.id_venda) AS count_vendas, 
+            WITH area_por_cliente AS (
+                -- Uma chave de roteirização representativa por cliente, agregada à parte
+                -- para não multiplicar as linhas de venda no JOIN abaixo caso um cliente
+                -- tenha mais de uma linha em v_clientes_rotas.
+                SELECT
+                    b.cl_codigo AS id_cliente,
+                    MAX(b.es_codigo) AS area
+                FROM v_clientes_rotas b
+                GROUP BY b.cl_codigo
+            )
+            SELECT TOP 20
+                ISNULL(MAX(c.nome_abreviado), MAX(c.nome_completo)) AS nome_cliente,
+                ISNULL(MAX(ac.area), '') AS area,
+                ISNULL(CAST(SUM(v.quantidade) AS FLOAT), 0) AS sum_quantidade,
+                COUNT(DISTINCT v.id_venda) AS count_vendas,
                 ISNULL(CAST(SUM(v.valor_total) AS FLOAT), 0) AS sum_valor_total
             FROM bi.wbx_vw_vendas_validas v
-            LEFT JOIN bi.wbx_vw_clientes c 
-                ON c.id_coligada = v.id_coligada 
+            LEFT JOIN bi.wbx_vw_clientes c
+                ON c.id_coligada = v.id_coligada
                AND c.id_cliente = v.id_cliente
-            WHERE v.is_deleted = 0 
+            LEFT JOIN area_por_cliente ac
+                ON ac.id_cliente = v.id_cliente
+            WHERE v.is_deleted = 0
               AND CAST(v.data_venda AS DATE) BETWEEN CAST(@dataInicio AS DATE) AND CAST(@dataFim AS DATE)
-              AND v.status IN (2, 3, 4) 
+              AND v.status IN (2, 3, 4)
               AND v.troca = 1
             GROUP BY v.id_cliente
             ORDER BY SUM(v.valor_total) DESC, COUNT(DISTINCT v.id_venda) DESC
@@ -814,18 +773,31 @@ app.get('/api/clientes/top-bonificacao', async (req, res) => {
         const { dataInicio = '2026-09-01', dataFim = '2026-09-30' } = req.query;
 
         const query = `
-            SELECT TOP 20 
-                ISNULL(MAX(c.nome_abreviado), MAX(c.nome_completo)) AS nome_cliente, 
-                ISNULL(CAST(SUM(v.quantidade) AS FLOAT), 0) AS sum_quantidade, 
-                COUNT(DISTINCT v.id_venda) AS count_vendas, 
+            WITH area_por_cliente AS (
+                -- Uma chave de roteirização representativa por cliente, agregada à parte
+                -- para não multiplicar as linhas de venda no JOIN abaixo caso um cliente
+                -- tenha mais de uma linha em v_clientes_rotas.
+                SELECT
+                    b.cl_codigo AS id_cliente,
+                    MAX(b.es_codigo) AS area
+                FROM v_clientes_rotas b
+                GROUP BY b.cl_codigo
+            )
+            SELECT TOP 20
+                ISNULL(MAX(c.nome_abreviado), MAX(c.nome_completo)) AS nome_cliente,
+                ISNULL(MAX(ac.area), '') AS area,
+                ISNULL(CAST(SUM(v.quantidade) AS FLOAT), 0) AS sum_quantidade,
+                COUNT(DISTINCT v.id_venda) AS count_vendas,
                 ISNULL(CAST(SUM(v.valor_total) AS FLOAT), 0) AS sum_valor_total
             FROM bi.wbx_vw_vendas_validas v
-            LEFT JOIN bi.wbx_vw_clientes c 
-                ON c.id_coligada = v.id_coligada 
+            LEFT JOIN bi.wbx_vw_clientes c
+                ON c.id_coligada = v.id_coligada
                AND c.id_cliente = v.id_cliente
-            WHERE v.is_deleted = 0 
+            LEFT JOIN area_por_cliente ac
+                ON ac.id_cliente = v.id_cliente
+            WHERE v.is_deleted = 0
               AND CAST(v.data_venda AS DATE) BETWEEN CAST(@dataInicio AS DATE) AND CAST(@dataFim AS DATE)
-              AND v.status IN (2, 3, 4) 
+              AND v.status IN (2, 3, 4)
               AND v.bonif = 1
             GROUP BY v.id_cliente
             ORDER BY SUM(v.valor_total) DESC, COUNT(DISTINCT v.id_venda) DESC

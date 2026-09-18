@@ -9,6 +9,23 @@ import { normalizarRotaLista } from '../../utils/wibiRota';
 import SectionCard from '../common/SectionCard';
 import Table from '../common/Table';
 
+/**
+ * `/api/vendas/diario` retorna uma linha por dia+área (para permitir o corte
+ * Grandes Redes/Varejo). Depois de aplicar o macro filtro, soma de volta para
+ * uma linha por dia — o gráfico e a detecção de picos trabalham no total do
+ * dia (ou do segmento selecionado), nunca em linhas fragmentadas por área.
+ */
+function agregarPorDia(rows) {
+  const porDia = new Map();
+  rows.forEach((r) => {
+    const atual = porDia.get(r.dia) ?? { dia: r.dia, total_vendas: 0, total_pedidos: 0 };
+    atual.total_vendas += Number(r.total_vendas) || 0;
+    atual.total_pedidos += Number(r.total_pedidos) || 0;
+    porDia.set(r.dia, atual);
+  });
+  return Array.from(porDia.values()).sort((a, b) => (a.dia < b.dia ? -1 : a.dia > b.dia ? 1 : 0));
+}
+
 function withAnomalias(rows) {
   if (rows.length < 3) return rows.map((r) => ({ ...r, pico: false }));
   const valores = rows.map((r) => r.total_pedidos);
@@ -54,7 +71,8 @@ export default function EvolucaoDiaria() {
     return filtrarPorMacro(rows, filters.macroFilter, { areaField: 'area' });
   }, [rows, hasArea, filters.macroFilter]);
 
-  const comAnomalias = useMemo(() => withAnomalias(filteredRows), [filteredRows]);
+  const porDia = useMemo(() => agregarPorDia(filteredRows), [filteredRows]);
+  const comAnomalias = useMemo(() => withAnomalias(porDia), [porDia]);
   const picos = comAnomalias.filter((r) => r.pico);
   const showMacroGapNotice = !hasArea && filters.macroFilter !== MACRO_FILTERS.GERAL;
 
