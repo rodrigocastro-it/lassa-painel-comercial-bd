@@ -14,20 +14,27 @@ consumindo a API Node.js/Express do repositório (`server.js` na raiz).
 
 ## Como rodar
 
+Rode em **dois terminais simultâneos**:
+
 ```bash
-# 1) Backend (na raiz do repositório)
+# Terminal 1 — Backend (na raiz do repositório)
 npm install
 cp .env.example .env   # preencha DB_USER, DB_PASSWORD, DB_SERVER, DB_DATABASE
-npm start              # sobe em http://localhost:3000
+node server.js          # sobe em http://localhost:8787
 
-# 2) Front-end (nesta pasta /frontend)
+# Terminal 2 — Front-end (obrigatoriamente dentro de /frontend, é onde fica o Vite)
 cd frontend
 npm install
-cp .env.example .env   # já aponta para http://localhost:3000/api
-npm run dev            # abre em http://localhost:5173
+cp .env.example .env   # já aponta para http://localhost:8787/api
+npm run dev             # abre em http://localhost:5173
 ```
 
 O front-end lê a URL base da API de `VITE_API_BASE_URL` (arquivo `.env`).
+A porta `8787` é o padrão fixo em `server.js` (`process.env.PORT || 8787`) —
+se seu `.env` da raiz não definir `PORT`, é essa a porta que sobe. Se o
+indicador no canto superior direito do painel ficar em "API offline" mesmo
+com o backend rodando, o motivo quase sempre é esse descompasso de porta
+entre os dois `.env`.
 
 ## Logo
 

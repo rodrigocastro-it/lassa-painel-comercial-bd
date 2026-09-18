@@ -26,7 +26,7 @@ export function useApiData(fetcher, deps, { initialData = null, skip = false } =
         setError(
           err?.code === 'ERR_NETWORK'
             ? 'Não foi possível conectar à API do backend. Verifique se o servidor Node.js está rodando em ' +
-                (import.meta.env.VITE_API_BASE_URL || 'http://localhost:3000/api') +
+                (import.meta.env.VITE_API_BASE_URL || 'http://localhost:8787/api') +
                 '.'
             : err?.response?.data?.error || err.message || 'Erro ao carregar dados.',
         );
