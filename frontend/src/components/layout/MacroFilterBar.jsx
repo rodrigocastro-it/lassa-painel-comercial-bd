@@ -5,7 +5,7 @@ import { MACRO_FILTERS } from '../../utils/businessRules';
 const OPTIONS = [
   { id: MACRO_FILTERS.GERAL, label: 'Visão Geral', icon: LayoutGrid },
   { id: MACRO_FILTERS.GRANDES_REDES, label: 'Grandes Redes (Área G / Especiais)', icon: Building2 },
-  { id: MACRO_FILTERS.VAREJO, label: 'Varejo (Áreas A, B, C, E)', icon: Store },
+  { id: MACRO_FILTERS.VAREJO, label: 'Varejo (demais áreas)', icon: Store },
 ];
 
 export default function MacroFilterBar() {

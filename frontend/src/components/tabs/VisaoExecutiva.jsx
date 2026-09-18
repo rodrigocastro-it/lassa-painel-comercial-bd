@@ -31,6 +31,7 @@ function buildResumoAreaRows(vendedores, canais, macroFilter) {
       const chave = `${v.area ?? '—'}|${v.supervisor ?? '—'}`;
       if (!grupos.has(chave)) {
         grupos.set(chave, {
+          id: chave,
           area: v.area ?? '—',
           supervisor: v.supervisor ?? '—',
           valor_total: 0,
@@ -47,6 +48,7 @@ function buildResumoAreaRows(vendedores, canais, macroFilter) {
   }
 
   const rows = canais.map((c) => ({
+    id: c.canal,
     area: c.canal,
     supervisor: '—',
     valor_total: Number(c.total_vendas) || 0,
@@ -209,7 +211,7 @@ export default function VisaoExecutiva() {
         error={errorCanais}
         isEmpty={resumoRows.length === 0}
       >
-        <Table columns={resumoColumns} rows={resumoRows} totalsRow={totalGeral} rowKey="area" />
+        <Table columns={resumoColumns} rows={resumoRows} totalsRow={totalGeral} rowKey="id" />
         {filters.macroFilter !== MACRO_FILTERS.GERAL && resumoRows.length === 0 && (
           <p className="mt-2 text-xs text-ink-muted">
             Nenhuma linha classificada como {filters.macroFilter === MACRO_FILTERS.GRANDES_REDES ? 'Grandes Redes' : 'Varejo'} no período.

@@ -1,6 +1,7 @@
 import { createContext, useContext, useMemo } from 'react';
 import { useApiData } from '../hooks/useApiData';
 import { getCanaisResumo, getVendedoresResumo } from '../services/api';
+import { normalizarRotaLista } from '../utils/wibiRota';
 import { useFilters } from './FilterContext';
 
 const SharedDataContext = createContext(null);
@@ -26,7 +27,9 @@ export function SharedDataProvider({ children }) {
 
   const value = useMemo(
     () => ({
-      vendedores: vendedores.data ?? [],
+      // Normaliza a chave de roteirização do WiBi (ex.: "001.A.0007.0007.0407")
+      // em area/zona/setor/rota, caso o backend ainda não os separe.
+      vendedores: normalizarRotaLista(vendedores.data) ?? [],
       loadingVendedores: vendedores.loading,
       errorVendedores: vendedores.error,
       canais: canais.data ?? [],

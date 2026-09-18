@@ -27,21 +27,23 @@ export default function ConceitosInfo() {
             <div>
               <p className="font-semibold text-lassa-blue-700">Grandes Redes</p>
               <p>
-                Clientes da <strong>Área G</strong> (ou classificados como <strong>Especiais</strong>) no ERP WiBi —
-                redes de supermercado e grandes contas com negociação centralizada (ex.: Assaí, Mateus, Extra).
+                Clientes cuja <strong>Área</strong> começa com <strong>G</strong> (ou é classificada como{' '}
+                <strong>Especiais</strong>) no ERP WiBi — redes de supermercado e grandes contas com negociação
+                centralizada (ex.: Assaí, Mateus, Extra).
               </p>
             </div>
             <div>
               <p className="font-semibold text-lassa-blue-700">Varejo</p>
               <p>
-                Clientes das <strong>Áreas A, B, C e E</strong> — o varejo tradicional/pulverizado, atendido pela
-                equipe de vendedores em rota.
+                <strong>Todas as demais Áreas</strong> (A, B, C, E e outras) — o varejo tradicional/pulverizado,
+                atendido pela equipe de vendedores em rota.
               </p>
             </div>
             <p className="border-t border-hairline pt-2 text-[11px] text-ink-muted">
-              Classificação aplicada automaticamente pelo campo <code>area</code> retornado pela API. No bloco
-              &quot;Canais&quot;, enquanto esse campo não está em todos os endpoints, a mesma regra é aplicada pelo
-              nome do cliente (rota <code>/api/canais/resumo</code>).
+              A Área vem da chave de roteirização do WiBi (ex.: <code>001.A.0007.0007.0407</code>), no formato
+              Coligada.Área.Zona.Setor.Rota. Classificação aplicada automaticamente pelo campo <code>area</code>{' '}
+              retornado pela API. No bloco &quot;Canais&quot;, enquanto esse campo não está em todos os endpoints, a
+              mesma regra é aplicada pelo nome do cliente (rota <code>/api/canais/resumo</code>).
             </p>
           </div>
         </div>

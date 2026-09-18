@@ -5,6 +5,7 @@ import { useApiData } from '../../hooks/useApiData';
 import { getVendasDiario } from '../../services/api';
 import { formatCurrency, formatCurrencyCompact, formatDateShort, formatInt } from '../../utils/format';
 import { filtrarPorMacro, MACRO_FILTERS } from '../../utils/businessRules';
+import { normalizarRotaLista } from '../../utils/wibiRota';
 import SectionCard from '../common/SectionCard';
 import Table from '../common/Table';
 
@@ -45,13 +46,13 @@ export default function EvolucaoDiaria() {
     { initialData: [] },
   );
 
-  const rows = data ?? [];
+  const rows = useMemo(() => normalizarRotaLista(data) ?? [], [data]);
   const hasArea = rows.some((r) => r.area);
 
   const filteredRows = useMemo(() => {
     if (!hasArea) return rows;
     return filtrarPorMacro(rows, filters.macroFilter, { areaField: 'area' });
-  }, [data, hasArea, filters.macroFilter]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [rows, hasArea, filters.macroFilter]);
 
   const comAnomalias = useMemo(() => withAnomalias(filteredRows), [filteredRows]);
   const picos = comAnomalias.filter((r) => r.pico);

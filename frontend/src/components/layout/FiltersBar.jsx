@@ -3,6 +3,7 @@ import { Calendar, ChevronDown, RotateCcw } from 'lucide-react';
 import { useFilters } from '../../context/FilterContext';
 import { useSharedData } from '../../context/SharedDataContext';
 import { PERIOD_PRESETS } from '../../utils/dateRange';
+import { periodicidadeSetor } from '../../utils/wibiRota';
 
 function distinctValues(list, field) {
   const values = new Set();
@@ -10,6 +11,13 @@ function distinctValues(list, field) {
     if (item[field]) values.add(String(item[field]));
   });
   return Array.from(values).sort();
+}
+
+/** Restringe a lista aos itens compatíveis com os filtros já escolhidos "acima" na cascata. */
+function restringirPorFiltrosSuperiores(list, filtrosSuperiores) {
+  return list.filter((item) =>
+    filtrosSuperiores.every(([campo, valor]) => !valor || String(item[campo]) === valor),
+  );
 }
 
 function CascadeSelect({ label, value, options, onChange, disabled, hint }) {
@@ -32,7 +40,7 @@ function CascadeSelect({ label, value, options, onChange, disabled, hint }) {
         </select>
         <ChevronDown size={14} className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 text-ink-muted" />
       </div>
-      {disabled && hint && <span className="text-[11px] text-ink-muted">{hint}</span>}
+      {hint && <span className="text-[11px] text-ink-muted">{hint}</span>}
     </label>
   );
 }
@@ -42,16 +50,41 @@ export default function FiltersBar() {
   const { vendedores } = useSharedData();
   const [showCustom, setShowCustom] = useState(filters.periodPreset === 'custom');
 
+  // Cascata real: cada nível só mostra opções compatíveis com o(s) nível(is) já escolhido(s) acima
+  // (Área -> Zona -> Setor -> Rota), seguindo a chave de roteirização do WiBi.
   const areas = useMemo(() => distinctValues(vendedores, 'area'), [vendedores]);
-  const zonas = useMemo(() => distinctValues(vendedores, 'zona'), [vendedores]);
-  const setores = useMemo(() => distinctValues(vendedores, 'setor'), [vendedores]);
-  const rotas = useMemo(() => distinctValues(vendedores, 'rota'), [vendedores]);
-  const nomesVendedores = useMemo(
-    () => distinctValues(vendedores, 'nome_vendedor'),
-    [vendedores],
+  const zonas = useMemo(
+    () => distinctValues(restringirPorFiltrosSuperiores(vendedores, [['area', filters.area]]), 'zona'),
+    [vendedores, filters.area],
   );
+  const setores = useMemo(
+    () =>
+      distinctValues(
+        restringirPorFiltrosSuperiores(vendedores, [
+          ['area', filters.area],
+          ['zona', filters.zona],
+        ]),
+        'setor',
+      ),
+    [vendedores, filters.area, filters.zona],
+  );
+  const rotas = useMemo(
+    () =>
+      distinctValues(
+        restringirPorFiltrosSuperiores(vendedores, [
+          ['area', filters.area],
+          ['zona', filters.zona],
+          ['setor', filters.setor],
+        ]),
+        'rota',
+      ),
+    [vendedores, filters.area, filters.zona, filters.setor],
+  );
+  const nomesVendedores = useMemo(() => distinctValues(vendedores, 'nome_vendedor'), [vendedores]);
 
   const cascadeGapHint = 'Aguardando o backend retornar este campo (ver README)';
+
+  const setSetorPeriodicidade = periodicidadeSetor(filters.setor);
 
   return (
     <div className="flex flex-col gap-3 rounded-xl border border-hairline bg-surface p-4">
@@ -125,25 +158,37 @@ export default function FiltersBar() {
           label="Área"
           value={filters.area}
           options={areas}
-          onChange={(v) => setCascadeFilter('area', v)}
+          onChange={(v) => {
+            setCascadeFilter('area', v);
+            setCascadeFilter('zona', '');
+            setCascadeFilter('setor', '');
+            setCascadeFilter('rota', '');
+          }}
           disabled={areas.length === 0}
-          hint={cascadeGapHint}
+          hint={areas.length === 0 ? cascadeGapHint : undefined}
         />
         <CascadeSelect
           label="Zona"
           value={filters.zona}
           options={zonas}
-          onChange={(v) => setCascadeFilter('zona', v)}
+          onChange={(v) => {
+            setCascadeFilter('zona', v);
+            setCascadeFilter('setor', '');
+            setCascadeFilter('rota', '');
+          }}
           disabled={zonas.length === 0}
-          hint={cascadeGapHint}
+          hint={zonas.length === 0 ? cascadeGapHint : undefined}
         />
         <CascadeSelect
           label="Setor"
           value={filters.setor}
           options={setores}
-          onChange={(v) => setCascadeFilter('setor', v)}
+          onChange={(v) => {
+            setCascadeFilter('setor', v);
+            setCascadeFilter('rota', '');
+          }}
           disabled={setores.length === 0}
-          hint={cascadeGapHint}
+          hint={setores.length === 0 ? cascadeGapHint : setSetorPeriodicidade ?? undefined}
         />
         <CascadeSelect
           label="Rota"
@@ -151,7 +196,7 @@ export default function FiltersBar() {
           options={rotas}
           onChange={(v) => setCascadeFilter('rota', v)}
           disabled={rotas.length === 0}
-          hint={cascadeGapHint}
+          hint={rotas.length === 0 ? cascadeGapHint : undefined}
         />
         <CascadeSelect
           label="Vendedor"
