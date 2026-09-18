@@ -1,15 +1,18 @@
 @import "tailwindcss";
 
 @theme {
-  /* Marca Lassa */
-  --color-lassa-blue-50: #eaf1fb;
+  /* Marca Lassa — azul institucional como cor de identidade/navegação,
+     vermelho e âmbar reservados a significado semântico (nunca decoração). */
+  --color-lassa-blue-50: #eef4fc;
   --color-lassa-blue-100: #cde2fb;
+  --color-lassa-blue-200: #a9cbf5;
   --color-lassa-blue-400: #3987e5;
   --color-lassa-blue-500: #2a78d6;
   --color-lassa-blue-600: #1c5cab;
   --color-lassa-blue-700: #184f95;
-  --color-lassa-blue-800: #0d366b;
-  --color-lassa-blue-900: #0a2a54;
+  --color-lassa-blue-800: #123c73;
+  --color-lassa-blue-900: #0c2a52;
+  --color-lassa-blue-950: #081d3a;
 
   --color-lassa-red-400: #e66767;
   --color-lassa-red-500: #e34948;
@@ -17,26 +20,45 @@
   --color-lassa-red-700: #a92b2b;
 
   --color-lassa-green-500: #0ca30c;
-  --color-lassa-green-600: #006300;
+  --color-lassa-green-600: #04820a;
 
-  --color-lassa-amber-500: #fab219;
+  --color-lassa-amber-500: #f2a30f;
   --color-lassa-orange-500: #eb6834;
+  --color-lassa-violet-500: #6d5bd0;
 
-  /* Superfícies / tinta (design system sóbrio, estilo SaaS corporativo) */
-  --color-surface: #fcfcfb;
-  --color-page: #f4f6f9;
-  --color-page-alt: #f6f7fa;
-  --color-ink-primary: #0b0f19;
-  --color-ink-secondary: #4b5565;
-  --color-ink-muted: #8a93a3;
-  --color-hairline: #e3e7ee;
+  /* Superfícies / tinta — tema claro, sóbrio, espaçoso */
+  --color-surface: #ffffff;
+  --color-surface-raised: #ffffff;
+  --color-page: #f2f4f8;
+  --color-page-alt: #f6f7fb;
+  --color-ink-primary: #0c1220;
+  --color-ink-secondary: #4d5666;
+  --color-ink-muted: #8992a3;
+  --color-ink-inverse: #ffffff;
+  --color-hairline: #e6e9f0;
+  --color-hairline-strong: #d7dbe6;
   --color-baseline: #c3c9d4;
+
+  /* Escala de espaçamento/raio/sombra do design system */
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-lg: 16px;
+  --radius-xl: 20px;
+  --radius-pill: 999px;
+
+  --shadow-xs: 0 1px 2px rgba(12, 18, 32, 0.04);
+  --shadow-sm: 0 1px 3px rgba(12, 18, 32, 0.06), 0 1px 2px rgba(12, 18, 32, 0.04);
+  --shadow-md: 0 4px 12px rgba(12, 18, 32, 0.07), 0 1px 2px rgba(12, 18, 32, 0.04);
+  --shadow-lg: 0 12px 32px rgba(12, 18, 32, 0.1), 0 2px 6px rgba(12, 18, 32, 0.05);
+  --shadow-blue: 0 8px 20px rgba(28, 92, 171, 0.18);
 
   /* Tons pré-misturados (hex puro) para fundos/bordas suaves. Usar SEMPRE
      estes tokens sólidos em vez do modificador de opacidade `/NN` do
      Tailwind: no Tailwind v4 ele gera `color-mix(in oklab, ...)`, função
      que o html2canvas (usado na exportação PNG) não sabe interpretar e
      quebra a captura de qualquer bloco que a contenha. */
+  --color-lassa-blue-tint: #eef4fc;
+  --color-lassa-blue-tint-border: #cfe0f7;
   --color-lassa-green-tint: #e7f7e7;
   --color-lassa-green-tint-border: #a9dba9;
   --color-lassa-red-tint: #fbeaea;
@@ -45,6 +67,7 @@
   --color-lassa-amber-tint: #fef2d6;
   --color-lassa-amber-tint-border: #f7cd76;
   --color-lassa-orange-tint: #fbe0d2;
+  --color-lassa-violet-tint: #ece9fa;
 
   --font-sans: "Segoe UI", system-ui, -apple-system, sans-serif;
 }
@@ -52,6 +75,7 @@
 @layer base {
   html {
     font-family: var(--font-sans);
+    -webkit-font-smoothing: antialiased;
   }
   body {
     background-color: var(--color-page);
@@ -77,5 +101,58 @@
   .capture-surface {
     background-color: var(--color-surface);
   }
+  .card {
+    background-color: var(--color-surface);
+    border: 1px solid var(--color-hairline);
+    border-radius: var(--radius-lg);
+    box-shadow: var(--shadow-xs);
+  }
+  .card-hover {
+    transition: box-shadow 160ms ease, border-color 160ms ease, transform 160ms ease;
+  }
+  .card-hover:hover {
+    box-shadow: var(--shadow-md);
+    border-color: var(--color-hairline-strong);
+  }
+  .focus-ring {
+    outline: none;
+  }
+  .focus-ring:focus-visible {
+    outline: 2px solid var(--color-lassa-blue-400);
+    outline-offset: 2px;
+  }
+}
+
+@keyframes fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes slide-in-right {
+  from {
+    transform: translateX(24px);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+/* Sem transform de propósito: um wrapper genérico como este envolve conteúdo
+   arbitrário (inclusive overlays fixed, como o Drawer). Um transform aqui —
+   mesmo translateY(0) parado — vira containing block e quebra `position:
+   fixed` de qualquer descendente, prendendo-o ao tamanho deste wrapper em
+   vez da viewport. */
+.animate-fade-in {
+  animation: fade-in 220ms ease both;
+}
+
+.animate-slide-in-right {
+  animation: slide-in-right 220ms cubic-bezier(0.16, 1, 0.3, 1) both;
 }
 

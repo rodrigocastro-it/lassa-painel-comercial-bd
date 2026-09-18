@@ -45,6 +45,21 @@ export function anoDaData(dataISO) {
   return dataISO.slice(0, 4);
 }
 
+/**
+ * Período imediatamente anterior, com a mesma duração (em dias corridos) do
+ * período informado — usado para calcular variações ("+4,8% vs período
+ * anterior") sem depender de nenhum endpoint novo no backend.
+ */
+export function periodoAnteriorEquivalente(dataInicio, dataFim) {
+  const dias = diasNoPeriodo(dataInicio, dataFim);
+  const inicio = new Date(`${dataInicio}T00:00:00Z`);
+  const fimAnterior = new Date(inicio);
+  fimAnterior.setUTCDate(fimAnterior.getUTCDate() - 1);
+  const inicioAnterior = new Date(fimAnterior);
+  inicioAnterior.setUTCDate(inicioAnterior.getUTCDate() - (dias - 1));
+  return { dataInicio: toISODate(inicioAnterior), dataFim: toISODate(fimAnterior) };
+}
+
 export const PERIOD_PRESETS = [
   { id: 'mes-atual', label: 'Mês Atual', getRange: mesAtualRange },
   { id: 'mes-anterior', label: 'Mês Anterior', getRange: mesAnteriorRange },

@@ -21,27 +21,30 @@ export default function ExportButtons({ title, subtitle, columns, rows, captureR
     }
   };
 
+  const btnClass =
+    'focus-ring flex h-8 w-8 items-center justify-center rounded-md text-ink-muted transition-colors hover:bg-page-alt';
+
   return (
-    <div className={`flex shrink-0 items-center gap-1.5 ${className}`}>
+    <div className={`flex shrink-0 items-center gap-0.5 ${className}`}>
       {canExportTable && (
         <>
           <button
             type="button"
             onClick={() => exportToExcel(title, columns, rows)}
             title="Exportar Excel (.xlsx)"
-            className="flex items-center gap-1.5 rounded-lg border border-hairline px-2.5 py-1.5 text-xs font-medium text-ink-secondary hover:border-lassa-green-500 hover:text-lassa-green-600"
+            aria-label="Exportar Excel"
+            className={`${btnClass} hover:text-lassa-green-600`}
           >
-            <FileSpreadsheet size={14} />
-            <span className="hidden md:inline">Excel</span>
+            <FileSpreadsheet size={15} />
           </button>
           <button
             type="button"
             onClick={() => exportToPdf(title, columns, rows, { subtitle })}
             title="Exportar PDF"
-            className="flex items-center gap-1.5 rounded-lg border border-hairline px-2.5 py-1.5 text-xs font-medium text-ink-secondary hover:border-lassa-red-500 hover:text-lassa-red-600"
+            aria-label="Exportar PDF"
+            className={`${btnClass} hover:text-lassa-red-600`}
           >
-            <FileText size={14} />
-            <span className="hidden md:inline">PDF</span>
+            <FileText size={15} />
           </button>
         </>
       )}
@@ -51,10 +54,10 @@ export default function ExportButtons({ title, subtitle, columns, rows, captureR
           onClick={handlePng}
           disabled={exportingPng}
           title="Baixar imagem PNG (para WhatsApp)"
-          className="flex items-center gap-1.5 rounded-lg border border-hairline px-2.5 py-1.5 text-xs font-medium text-ink-secondary hover:border-lassa-blue-500 hover:text-lassa-blue-700 disabled:opacity-60"
+          aria-label="Baixar imagem PNG"
+          className={`${btnClass} hover:text-lassa-blue-700 disabled:opacity-60`}
         >
-          {exportingPng ? <Loader2 size={14} className="animate-spin" /> : <ImageIcon size={14} />}
-          <span className="hidden md:inline">Imagem</span>
+          {exportingPng ? <Loader2 size={15} className="animate-spin" /> : <ImageIcon size={15} />}
         </button>
       )}
     </div>

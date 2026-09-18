@@ -1,13 +1,13 @@
 import { createContext, useContext, useMemo, useState, useCallback } from 'react';
 import { MACRO_FILTERS } from '../utils/businessRules';
-import { mesAtualRange, anoDaData } from '../utils/dateRange';
+import { mesAtualRange, anoDaData, periodoAnteriorEquivalente } from '../utils/dateRange';
 
 const FilterContext = createContext(null);
 
 const initialRange = mesAtualRange();
 
 const initialState = {
-  macroFilter: MACRO_FILTERS.GERAL,
+  macroFilter: MACRO_FILTERS.VAREJO,
   periodPreset: 'mes-atual',
   dataInicio: initialRange.dataInicio,
   dataFim: initialRange.dataFim,
@@ -49,17 +49,29 @@ export function FilterProvider({ children }) {
 
   const ano = useMemo(() => anoDaData(filters.dataFim), [filters.dataFim]);
 
+  const periodoAnterior = useMemo(
+    () => periodoAnteriorEquivalente(filters.dataInicio, filters.dataFim),
+    [filters.dataInicio, filters.dataFim],
+  );
+
+  const filtrosAtivos = useMemo(
+    () => [filters.area, filters.zona, filters.setor, filters.rota, filters.vendedor].filter(Boolean).length,
+    [filters.area, filters.zona, filters.setor, filters.rota, filters.vendedor],
+  );
+
   const value = useMemo(
     () => ({
       filters,
       periodo,
+      periodoAnterior,
       ano,
+      filtrosAtivos,
       setMacroFilter,
       setPeriod,
       setCascadeFilter,
       resetCascadeFilters,
     }),
-    [filters, periodo, ano, setMacroFilter, setPeriod, setCascadeFilter, resetCascadeFilters],
+    [filters, periodo, periodoAnterior, ano, filtrosAtivos, setMacroFilter, setPeriod, setCascadeFilter, resetCascadeFilters],
   );
 
   return <FilterContext.Provider value={value}>{children}</FilterContext.Provider>;

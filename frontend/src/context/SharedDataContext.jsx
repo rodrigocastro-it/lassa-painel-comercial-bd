@@ -1,17 +1,19 @@
 import { createContext, useContext, useMemo } from 'react';
 import { useApiData } from '../hooks/useApiData';
-import { getCanaisResumo, getVendedoresResumo } from '../services/api';
+import { getCanaisResumo, getKpisCobertura, getKpisTotais, getVendedoresResumo } from '../services/api';
 import { normalizarRotaLista } from '../utils/wibiRota';
 import { useFilters } from './FilterContext';
 
 const SharedDataContext = createContext(null);
 
 /**
- * Dados usados em múltiplas telas (filtros em cascata + tabelas) para o
- * mesmo período selecionado, evitando refetch duplicado da mesma consulta.
+ * Dados usados em múltiplas telas (hero de positivação, KPIs, filtros em
+ * cascata, tabelas) para o mesmo período selecionado — e também para o
+ * período anterior equivalente, para permitir comparações ("+4,8% vs
+ * período anterior") sem endpoints novos no backend.
  */
 export function SharedDataProvider({ children }) {
-  const { periodo } = useFilters();
+  const { periodo, periodoAnterior } = useFilters();
 
   const vendedores = useApiData(
     () => getVendedoresResumo(periodo),
@@ -25,6 +27,18 @@ export function SharedDataProvider({ children }) {
     { initialData: [] },
   );
 
+  const totais = useApiData(() => getKpisTotais(periodo), [periodo.dataInicio, periodo.dataFim]);
+  const cobertura = useApiData(() => getKpisCobertura(periodo), [periodo.dataInicio, periodo.dataFim]);
+
+  const totaisAnterior = useApiData(
+    () => getKpisTotais(periodoAnterior),
+    [periodoAnterior.dataInicio, periodoAnterior.dataFim],
+  );
+  const coberturaAnterior = useApiData(
+    () => getKpisCobertura(periodoAnterior),
+    [periodoAnterior.dataInicio, periodoAnterior.dataFim],
+  );
+
   const value = useMemo(
     () => ({
       // Normaliza a chave de roteirização do WiBi (ex.: "001.A.0007.0007.0407")
@@ -35,8 +49,23 @@ export function SharedDataProvider({ children }) {
       canais: canais.data ?? [],
       loadingCanais: canais.loading,
       errorCanais: canais.error,
+      totais,
+      cobertura,
+      totaisAnterior,
+      coberturaAnterior,
     }),
-    [vendedores.data, vendedores.loading, vendedores.error, canais.data, canais.loading, canais.error],
+    [
+      vendedores.data,
+      vendedores.loading,
+      vendedores.error,
+      canais.data,
+      canais.loading,
+      canais.error,
+      totais,
+      cobertura,
+      totaisAnterior,
+      coberturaAnterior,
+    ],
   );
 
   return <SharedDataContext.Provider value={value}>{children}</SharedDataContext.Provider>;

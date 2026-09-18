@@ -9,10 +9,11 @@ export default function ConceitosInfo() {
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
-        className="flex items-center gap-1.5 rounded-lg border border-hairline px-3 py-2 text-xs font-medium text-ink-secondary hover:border-lassa-blue-400 hover:text-lassa-blue-700"
+        aria-label="O que é Grandes Redes / Varejo?"
+        title="O que é Grandes Redes / Varejo?"
+        className="focus-ring flex h-9 w-9 items-center justify-center rounded-full text-ink-muted transition-colors hover:bg-page-alt hover:text-lassa-blue-700"
       >
-        <HelpCircle size={14} />
-        O que é Grandes Redes / Varejo?
+        <HelpCircle size={17} />
       </button>
 
       {open && (

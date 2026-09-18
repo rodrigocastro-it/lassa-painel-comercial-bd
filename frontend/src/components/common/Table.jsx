@@ -2,16 +2,16 @@ function displayValue(value) {
   return value === '' || value === null || value === undefined ? '—' : value;
 }
 
-export default function Table({ columns, rows, totalsRow, rowKey, dense }) {
+export default function Table({ columns, rows, totalsRow, rowKey, dense, onRowClick }) {
   return (
-    <div className="overflow-x-auto rounded-lg border border-hairline">
+    <div className="overflow-x-auto rounded-md border border-hairline">
       <table className="w-full min-w-[560px] border-collapse text-sm">
         <thead>
-          <tr className="bg-page text-left text-xs font-semibold uppercase tracking-wide text-ink-secondary">
+          <tr className="border-b border-hairline bg-page-alt text-left text-[11px] font-bold uppercase tracking-wide text-ink-muted">
             {columns.map((col) => (
               <th
                 key={col.key}
-                className={`whitespace-nowrap px-3 ${dense ? 'py-2' : 'py-2.5'} ${col.align === 'right' ? 'text-right' : 'text-left'}`}
+                className={`whitespace-nowrap px-3.5 ${dense ? 'py-2' : 'py-2.5'} ${col.align === 'right' ? 'text-right' : 'text-left'}`}
               >
                 {col.label}
               </th>
@@ -22,12 +22,13 @@ export default function Table({ columns, rows, totalsRow, rowKey, dense }) {
           {rows.map((row, idx) => (
             <tr
               key={rowKey ? row[rowKey] : idx}
-              className="border-t border-hairline odd:bg-surface even:bg-page-alt hover:bg-lassa-blue-50"
+              onClick={onRowClick ? () => onRowClick(row) : undefined}
+              className={`border-t border-hairline transition-colors hover:bg-lassa-blue-tint ${onRowClick ? 'cursor-pointer' : ''}`}
             >
               {columns.map((col) => (
                 <td
                   key={col.key}
-                  className={`whitespace-nowrap px-3 ${dense ? 'py-1.5' : 'py-2'} ${col.align === 'right' ? 'text-right tabular' : 'text-left'}`}
+                  className={`whitespace-nowrap px-3.5 ${dense ? 'py-1.5' : 'py-2.5'} ${col.align === 'right' ? 'text-right tabular' : 'text-left'}`}
                 >
                   {col.format ? col.format(row[col.key], row) : displayValue(row[col.key])}
                 </td>
@@ -37,11 +38,11 @@ export default function Table({ columns, rows, totalsRow, rowKey, dense }) {
         </tbody>
         {totalsRow && (
           <tfoot>
-            <tr className="border-t-2 border-lassa-blue-600 bg-lassa-blue-50 font-semibold text-ink-primary">
+            <tr className="border-t-2 border-lassa-blue-600 bg-lassa-blue-tint font-bold text-ink-primary">
               {columns.map((col) => (
                 <td
                   key={col.key}
-                  className={`whitespace-nowrap px-3 py-2.5 ${col.align === 'right' ? 'text-right tabular' : 'text-left'}`}
+                  className={`whitespace-nowrap px-3.5 py-2.5 ${col.align === 'right' ? 'text-right tabular' : 'text-left'}`}
                 >
                   {col.format ? col.format(totalsRow[col.key], totalsRow) : totalsRow[col.key] ?? ''}
                 </td>
