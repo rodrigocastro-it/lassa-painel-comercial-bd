@@ -25,6 +25,14 @@
   --color-lassa-amber-500: #f2a30f;
   --color-lassa-orange-500: #eb6834;
   --color-lassa-violet-500: #6d5bd0;
+  --color-lassa-rose-400: #f184a3;
+  --color-lassa-rose-500: #ec6f92;
+  --color-lassa-maroon-600: #9c2338;
+  --color-lassa-maroon-700: #7f1c2e;
+
+  /* Painel escuro (tela de login) */
+  --color-lassa-navy-950: #0b1424;
+  --color-lassa-navy-900: #0e1b30;
 
   /* Superfícies / tinta — tema claro, sóbrio, espaçoso */
   --color-surface: #ffffff;

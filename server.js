@@ -15,6 +15,51 @@ app.get('/api/status', (req, res) => {
     res.json({ status: 'API Lassa Dashboard Operacional 🚀', timestamp: new Date() });
 });
 
+// --- Autenticação (acesso compartilhado do piloto) ---
+// Checagem simples de usuário/senha em memória, configurável via AUTH_USERS
+// no .env ("usuario:senha,usuario:senha,..."). Sem isso, usa os usuários
+// padrão combinados com a Lassa, todos com o mesmo nível de acesso. Não é
+// um sistema de contas de verdade (sem hash, sem sessão/token) — serve só
+// como porta de entrada para a equipe de validação do piloto; os demais
+// endpoints da API continuam abertos como sempre.
+function parseAuthUsers(raw) {
+    const pares = (raw || '')
+        .split(',')
+        .map((p) => p.trim())
+        .filter(Boolean)
+        .map((p) => p.split(':'));
+    const map = new Map();
+    pares.forEach(([usuario, senha]) => {
+        if (usuario && senha) map.set(usuario.trim().toLowerCase(), senha);
+    });
+    return map;
+}
+
+const AUTH_USERS_PADRAO = new Map([
+    ['lassa', 'lassaleite'],
+    ['moacirneto', 'moacirnetoleite'],
+    ['moacirfilho', 'moacirfilholeite'],
+    ['zuleika', 'zuleikaleite'],
+]);
+
+const AUTH_USERS = (() => {
+    const doEnv = parseAuthUsers(process.env.AUTH_USERS);
+    return doEnv.size > 0 ? doEnv : AUTH_USERS_PADRAO;
+})();
+
+app.post('/api/auth/login', (req, res) => {
+    const { usuario, senha } = req.body || {};
+    if (!usuario || !senha) {
+        return res.status(400).json({ ok: false, error: 'Informe usuário e senha.' });
+    }
+    const chave = String(usuario).trim().toLowerCase();
+    const senhaEsperada = AUTH_USERS.get(chave);
+    if (!senhaEsperada || senhaEsperada !== senha) {
+        return res.status(401).json({ ok: false, error: 'Usuário ou senha incorretos.' });
+    }
+    res.json({ ok: true, usuario: chave });
+});
+
 // Endpoint 1: Totais de Faturamento e Margem (Query kpi_totais)
 app.get('/api/kpis/totais', async (req, res) => {
     try {

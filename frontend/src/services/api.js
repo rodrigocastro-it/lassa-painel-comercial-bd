@@ -23,6 +23,12 @@ async function get(path, params) {
 // --- Status ---
 export const getStatus = () => get('/status');
 
+// --- Autenticação (acesso compartilhado do piloto) ---
+export const loginPiloto = async (usuario, senha) => {
+  const { data } = await api.post('/auth/login', { usuario, senha });
+  return data;
+};
+
 // --- KPIs ---
 export const getKpisTotais = (periodo) => get('/kpis/totais', periodo);
 export const getKpisCobertura = (periodo) => get('/kpis/cobertura', periodo);
